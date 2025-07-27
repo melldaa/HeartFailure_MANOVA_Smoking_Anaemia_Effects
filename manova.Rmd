@@ -4,6 +4,7 @@ output: html_document
 ---
 
 ```{r}
+# Load necessary packages
 #install.packages("tidyverse")
 library(tidyverse)
 library(ggpubr)
@@ -15,39 +16,42 @@ library(tidyr)
 library(haven)
 library(readxl)
 
+# Read dataset
 heart_failure <- read_excel("C:/Users/lenovo/Downloads/heart_failure_clinical_records.xlsx")
 View(heart_failure)
 ```
 
 
 ```{r}
+# Recode categorical variables
 heart_failure$smoking<-factor(heart_failure$smoking)
 heart_failure$anaemia<-factor(heart_failure$anaemia)
 summary(heart_failure)
 
 ```
 ```{r}
-#Grup gozlem dagilimi
+# Group size by smoking status
 heart_failure %>%
   group_by(smoking) %>%
   dplyr::summarise(N = n())
 ```
 ```{r}
-#Degiskenlere Göre Ortalamalar ve Ortalama Çizimleri
+# Group means and standard deviations by smoking
 #smoking duzeyleri bazında degisken ortalamaları ve sapmalar
 heart_failure %>% 
   group_by(smoking) %>%
   summarise(across(-anaemia, list(mean=mean,sd=sd)))
 ```
 
-
 ```{r}
-#yüksek tansiyon duzeyleri bazında degisken ortalamaları
+# Group means and standard deviations by anaemia
 heart_failure %>% 
   group_by(anaemia) %>%
   summarise(across(-smoking, list(mean=mean,sd=sd)))
 ```
+
 ```{r}
+# Mean plots by smoking
 library(gplots)
 #smoking için
 plotmeans(serum_creatinine~smoking,xlab="smoking",ylab="serum_creatinine", main="Mean Plot\nwith 95% CI",data=heart_failure)
@@ -71,10 +75,10 @@ plotmeans(time~smoking,xlab="smoking",ylab="time", main="Mean Plot\nwith 95% CI"
 plotmeans(death_event~smoking, xlab="smoking",ylab="death_event", main="Mean Plot\nwith 95% CI",data=heart_failure)
 
 plotmeans(high_blood_pressure~smoking, xlab="smoking",ylab="high_blood_pressure", main="Mean Plot\nwith 95% CI",data=heart_failure)
-
 ```
 
 ```{r}
+# Mean plots by anaemia
 library(gplots)
 #yüksek tansiyon için
 plotmeans(serum_creatinine~anaemia,xlab="anaemia",ylab="serum_creatinine", main="Mean Plot\nwith 95% CI",data=heart_failure)
@@ -98,25 +102,24 @@ plotmeans(time~anaemia,xlab="anaemia",ylab="time", main="Mean Plot\nwith 95% CI"
 plotmeans(death_event~anaemia, xlab="anaemia",ylab="death_event", main="Mean Plot\nwith 95% CI",data=heart_failure)
 
 plotmeans(high_blood_pressure~anaemia, xlab="anaemia",ylab="high_blood_pressure", main="Mean Plot\nwith 95% CI",data=heart_failure)
-
 ```
 
 ```{r}
-#Multivariate Normality
+# Multivariate normality test
 library(dplyr)
 heart_failure %>%
   dplyr::select(serum_sodium,platelets,ejection_fraction,serum_creatinine,creatinine_phosphokinase,time,age) %>%
   mshapiro_test()
 ```
 ```{r}
-#Homogeneity of Covariances
+# Box's M test for homogeneity of covariance matrices
 #install.packages("biotools")
 library(biotools)
 box_m(heart_failure[, c("serum_sodium","ejection_fraction","serum_creatinine","time","age")],heart_failure$smoking)
 
 ```
 ```{r}
-#MANOVA  
+# MANOVA - Multivariate test for smoking
 heart_manova <- manova(cbind(serum_sodium,ejection_fraction,serum_creatinine,time,age) ~ smoking,data=heart_failure)
 
 summary(heart_manova, test = "Hotelling-Lawley")
@@ -127,22 +130,23 @@ summary(heart_manova, test = "Pillai")
 
 summary(heart_manova, test = "Roy")
 ```
-```{r}
 
+```{r}
+# Levene's test for homogeneity of variances
 library(car)
-#Homogeneity of variance- Levene's Test
 heart_failure %>% 
   pivot_longer( c(serum_sodium,ejection_fraction,serum_creatinine,time,age),names_to = "variable", values_to = "value") %>%
   group_by(variable) %>%
   levene_test(value ~ smoking,center=mean)
 ```
+
 ```{r}
-### Test of Between Subjects####Farkliligi yaratan degisken hangisi ?
+# Between-subject effects: Which variable is driving the difference?
 summary.aov(heart_manova)
 ```
+
 ```{r}
-# Çoklu Karsilastirmalar (Multiple Comparisons)
-#Levene- Equal variances -Tukey
+# Tukey post-hoc comparisons
 m_tukey <- heart_failure%>%
   pivot_longer( c(serum_sodium,ejection_fraction,serum_creatinine,time,age),names_to = "variables", values_to = "value") %>%
   group_by(variables) %>%
@@ -150,20 +154,21 @@ m_tukey <- heart_failure%>%
 m_tukey<-m_tukey[,c(1,2,4,3,5:9)]
 m_tukey
 ```
-```{r}
-###Çift Yönlü Manova
 
+```{r}
+# Two-way MANOVA (interaction of smoking and anaemia)
 library(heplots)
 boxM( cbind(serum_sodium,ejection_fraction,serum_creatinine,time,age,creatinine_phosphokinase) ~ smoking*anaemia, data=heart_failure)
 ```
+
 ```{r}
 #MANOVA  
 smoking_cift <- manova(cbind(serum_sodium,ejection_fraction,serum_creatinine,time,age,creatinine_phosphokinase) ~ smoking*anaemia,data=heart_failure)
-#Sadece wilks alindi ornek icin, uygun olan secilebilir
 summary(smoking_cift, test = "Wilks")
 ```
+
 ```{r}
-#Homogeneity of variance- Levene's Test
+# Levene’s test for interaction
 #install.packages("car")
 library(car)
 heart_failure %>% 
@@ -171,13 +176,13 @@ heart_failure %>%
   group_by(variable) %>%
   levene_test(value ~ smoking*anaemia,center=mean)
 ```
+
 ```{r}
-### Test of Between Subjects####Farklilik yaratan degisken hangisi ?
+# Between-subject effects: Which variable is significant in interaction?
 summary.aov(smoking_cift)
 ```
 ```{r}
-# Çoklu Karsilastirmalar (Multiple Comparisons)
-#anaemia icin
+# Multiple comparisons for anaemia
 m_tukey2 <- heart_failure %>%
   pivot_longer( c(platelets,serum_sodium,creatinine_phosphokinase),names_to = "variables", values_to = "value") %>%
   group_by(variables) %>%
@@ -185,10 +190,10 @@ m_tukey2 <- heart_failure %>%
 m_tukey2<-m_tukey2[,c(1,2,4,3,5:9)]
 anaemia_etk<-filter(m_tukey2, term=="anaemia")
 anaemia_etk
-
 ```
+
 ```{r}
-#smoking ve anaemia için Etkilesim Grafikleri (Interaction Plots) 
+# Interaction plots for smoking and anaemia
 attach(heart_failure)
 interaction.plot(anaemia,smoking,serum_sodium, fun=mean, type="l", legend=TRUE,col=1:3, lwd=2)
 interaction.plot(anaemia,smoking,platelets, fun=mean, type="l", legend=TRUE, col=1:3,lwd=2)
